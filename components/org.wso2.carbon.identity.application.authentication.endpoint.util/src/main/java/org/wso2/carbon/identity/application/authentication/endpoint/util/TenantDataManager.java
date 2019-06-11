@@ -29,6 +29,7 @@ import org.w3c.dom.NodeList;
 import org.wso2.carbon.identity.core.util.IdentityUtil;
 import org.wso2.securevault.SecretResolver;
 import org.wso2.securevault.SecretResolverFactory;
+import org.wso2.securevault.commons.MiscellaneousUtil;
 import org.xml.sax.InputSource;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -55,6 +56,7 @@ public class TenantDataManager {
     private static final Log log = LogFactory.getLog(TenantDataManager.class);
 
     private static final String SECRET_ALIAS = "secretAlias:";
+    private static final String NEW_SECRET_ALIAS = "$secret";
     private static Properties prop;
     private static String carbonLogin = "";
     private static String serviceURL;
@@ -352,19 +354,15 @@ public class TenantDataManager {
             // Iterate through whole config file and find encrypted properties and resolve them
             while (propertyNames.hasMoreElements()) {
                 String key = (String) propertyNames.nextElement();
-                if (secretResolver.isTokenProtected(key)) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Resolving and replacing secret for " + key);
-                    }
-                    // Resolving the secret password.
-                    String value = secretResolver.resolve(key);
-                    // Replaces the original encrypted property with resolved property
-                    properties.put(key, value);
-                } else {
-                    if (log.isDebugEnabled()) {
-                        log.debug("No encryption done for value with key :" + key);
+                String value = properties.getProperty(key);
+                if (value != null) {
+                    if (secretResolver.isTokenProtected(key)) {
+                        value = secretResolver.resolve(key);
+                    } else {
+                        value = MiscellaneousUtil.resolve(value, secretResolver);
                     }
                 }
+                properties.put(key, value);
             }
         } else {
             log.warn("Secret Resolver is not present. Will not resolve encryptions in " + Constants.TenantConstants
@@ -383,7 +381,8 @@ public class TenantDataManager {
 
         while (propertyNames.hasMoreElements()) {
             String key = (String) propertyNames.nextElement();
-            if (StringUtils.startsWith(properties.getProperty(key), SECRET_ALIAS)) {
+            if (StringUtils.startsWith(properties.getProperty(key), SECRET_ALIAS) ||
+                    StringUtils.startsWith(properties.getProperty(key), NEW_SECRET_ALIAS) ) {
                 return true;
             }
         }
